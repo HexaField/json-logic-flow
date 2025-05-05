@@ -287,14 +287,32 @@ const App: React.FC = () => {
             let sourceIsTop = false;
             let targetIsTop = false;
 
-            // Check source handle position (top or bottom)
+            // Extract handle indices for horizontal positioning
+            let sourceHandleIndex = 0;
+            let targetHandleIndex = 0;
+
+            // Check source handle position (top or bottom) and extract index
             if (link.sourceHandle) {
               sourceIsTop = typeof link.sourceHandle === 'string' && link.sourceHandle.includes('top');
+
+              // Extract the index from the handle ID (format: "input-X" or "output-X")
+              const sourceIndexMatch = typeof link.sourceHandle === 'string' &&
+                link.sourceHandle.match(/(?:input|output)-(\d+)/);
+              if (sourceIndexMatch && sourceIndexMatch[1]) {
+                sourceHandleIndex = parseInt(sourceIndexMatch[1], 10);
+              }
             }
 
-            // Check target handle position (top or bottom)
+            // Check target handle position (top or bottom) and extract index
             if (link.targetHandle) {
               targetIsTop = typeof link.targetHandle === 'string' && link.targetHandle.includes('top');
+
+              // Extract the index from the handle ID (format: "input-X" or "output-X")
+              const targetIndexMatch = typeof link.targetHandle === 'string' &&
+                link.targetHandle.match(/(?:input|output)-(\d+)/);
+              if (targetIndexMatch && targetIndexMatch[1]) {
+                targetHandleIndex = parseInt(targetIndexMatch[1], 10);
+              }
             }
 
             // Calculate vertical force strength based on handle positions
@@ -311,11 +329,32 @@ const App: React.FC = () => {
               target.y = (target.y || 0) + verticalForceStrength;
             }
 
-            // Apply horizontal separation force when nodes are at similar vertical positions
-            if (Math.abs((source.y || 0) - (target.y || 0)) < 80) {
-              const horizontalForceStrength = 3 * alpha;
+            // Apply horizontal forces based on handle indices
+            // This helps position nodes with multiple inputs/outputs in a more logical way
+            const horizontalForceStrength = 8 * alpha;
+
+            // If source handle is on the left side of its node, push the source node to the left
+            if (sourceHandleIndex === 0) {
               source.x = (source.x || 0) - horizontalForceStrength;
-              target.x = (target.x || 0) + horizontalForceStrength;
+            }
+            // If source handle is on the right side of its node, push the source node to the right
+            else if (sourceHandleIndex >= 1) {
+              source.x = (source.x || 0) + (sourceHandleIndex * horizontalForceStrength * 1.5);
+            }
+
+            // If target handle is on the left side of its node, push the target node to the left
+            if (targetHandleIndex === 0) {
+              target.x = (target.x || 0) - horizontalForceStrength;
+            }
+            // If target handle is on the right side of its node, push the target node to the right
+            else if (targetHandleIndex >= 1) {
+              target.x = (target.x || 0) + (targetHandleIndex * horizontalForceStrength * 1.5);
+            }
+
+            // Apply additional horizontal separation force when nodes are at similar vertical positions
+            if (Math.abs((source.y || 0) - (target.y || 0)) < 100) {
+              source.x = (source.x || 0) - horizontalForceStrength * 0.5;
+              target.x = (target.x || 0) + horizontalForceStrength * 0.5;
             }
           }
         });
@@ -358,7 +397,7 @@ const App: React.FC = () => {
 
       // Run the simulation for enough ticks to allow untangling
       simulation.stop();
-      simulation.tick(2000); // Run for more ticks to ensure stable layout
+      simulation.tick(3000); // Run for more ticks to ensure stable layout with the new forces
 
       // Update the node positions based on the simulation
       // Apply the simulated positions directly

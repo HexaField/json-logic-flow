@@ -134,37 +134,249 @@ const App: React.FC = () => {
           forceNodes.some(node => node.id === edge.source) &&
           forceNodes.some(node => node.id === edge.target)
         )
-        .map(edge => ({
-          source: edge.source,
-          target: edge.target
-        }));
+        .map(edge => {
+          console.log('Edge handles:', {
+            source: edge.source,
+            target: edge.target,
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle
+          });
 
-      // Create the simulation with more moderate forces
+          return {
+            source: edge.source,
+            target: edge.target,
+            // Store the source and target handles for untangling
+            sourceHandle: edge.sourceHandle,
+            targetHandle: edge.targetHandle
+          };
+        });
+
+      // Create a map of node IDs to their connection types
+      // This helps us understand which nodes are primarily sources vs targets
+      const nodeConnectionTypes: Record<string, { isSource: boolean, isTarget: boolean }> = {};
+
+      // Initialize all nodes
+      forceNodes.forEach(node => {
+        nodeConnectionTypes[node.id] = { isSource: false, isTarget: false };
+      });
+
+      // Analyze connections
+      links.forEach(link => {
+        if (nodeConnectionTypes[link.source]) {
+          nodeConnectionTypes[link.source].isSource = true;
+        }
+        if (nodeConnectionTypes[link.target]) {
+          nodeConnectionTypes[link.target].isTarget = true;
+        }
+      });
+
+      // Calculate graph structure metrics to help with layout
+      const calculateGraphMetrics = () => {
+        // Create a map to track node depths (distance from root)
+        const nodeDepths: Record<string, number> = {};
+
+        // Find root nodes (nodes that are only sources, not targets)
+        const rootNodeIds = Object.entries(nodeConnectionTypes)
+          .filter(([_, type]) => type.isSource && !type.isTarget)
+          .map(([id]) => id);
+
+        // If no clear root nodes, use nodes with more outgoing than incoming connections
+        if (rootNodeIds.length === 0) {
+          // Count incoming and outgoing connections for each node
+          const connectionCounts: Record<string, { incoming: number, outgoing: number }> = {};
+
+          forceNodes.forEach(node => {
+            connectionCounts[node.id] = { incoming: 0, outgoing: 0 };
+          });
+
+          links.forEach(link => {
+            if (connectionCounts[link.source]) connectionCounts[link.source].outgoing++;
+            if (connectionCounts[link.target]) connectionCounts[link.target].incoming++;
+          });
+
+          // Find nodes with more outgoing than incoming connections
+          Object.entries(connectionCounts).forEach(([id, counts]) => {
+            if (counts.outgoing > counts.incoming) {
+              rootNodeIds.push(id);
+            }
+          });
+
+          // If still no root nodes, just use the first node
+          if (rootNodeIds.length === 0 && forceNodes.length > 0) {
+            rootNodeIds.push(forceNodes[0].id);
+          }
+        }
+
+        // Initialize all nodes with depth -1 (unvisited)
+        forceNodes.forEach(node => {
+          nodeDepths[node.id] = -1;
+        });
+
+        // Set root nodes to depth 0
+        rootNodeIds.forEach(id => {
+          nodeDepths[id] = 0;
+        });
+
+        // Breadth-first traversal to assign depths
+        let currentDepth = 0;
+        let nodesToProcess = [...rootNodeIds];
+        let nextNodesToProcess: string[] = [];
+
+        // Continue until we've processed all reachable nodes
+        while (nodesToProcess.length > 0 && currentDepth < 100) { // Prevent infinite loops
+          currentDepth++;
+
+          // Process all nodes at the current depth
+          nodesToProcess.forEach(nodeId => {
+            // Find all targets of this node
+            links.forEach(link => {
+              if (link.source === nodeId && nodeDepths[link.target] === -1) {
+                nodeDepths[link.target] = currentDepth;
+                nextNodesToProcess.push(link.target);
+              }
+            });
+          });
+
+          // Move to the next depth level
+          nodesToProcess = nextNodesToProcess;
+          nextNodesToProcess = [];
+        }
+
+        // For any unvisited nodes, assign a middle depth
+        const maxDepth = Math.max(...Object.values(nodeDepths).filter(d => d >= 0));
+        forceNodes.forEach(node => {
+          if (nodeDepths[node.id] === -1) {
+            nodeDepths[node.id] = Math.floor(maxDepth / 2);
+          }
+        });
+
+        return { nodeDepths, maxDepth };
+      };
+
+      // Get graph metrics
+      const { nodeDepths, maxDepth } = calculateGraphMetrics();
+
+      // Create the simulation with stronger forces
       const simulation = forceSimulation<ForceNode>(forceNodes)
-        .force('charge', forceManyBody().strength(-200)) // More moderate repulsion
-        .force('center', forceCenter(400, 200)); // Center more towards the top
+        .force('charge', forceManyBody().strength(-9000)) // Strong repulsion to avoid overlaps
+        .force('center', forceCenter(400, 300)) // Center in the middle
+
+      // Add a force to position nodes based on their depth in the graph
+      simulation.force('depth', (alpha: number) => {
+        forceNodes.forEach(node => {
+          const depth = nodeDepths[node.id];
+          if (depth !== undefined) {
+            // Calculate target Y position based on depth
+            // Normalize to spread evenly across the canvas height
+            const targetY = 100 + (depth / Math.max(1, maxDepth)) * 600;
+            // Apply force towards target position
+            node.y = (node.y || 0) + ((targetY - (node.y || 0)) * alpha * 0.3);
+          }
+        });
+      });
 
       // Only add link force if there are valid links
       if (links.length > 0) {
         simulation.force('link',
           forceLink(links)
             .id((d: any) => d.id)
-            .distance(100) // More moderate distance between connected nodes
+            .distance(250) // Increased distance between connected nodes
         );
+
+        // Add a data-driven directional force based on the flow direction
+        simulation.force('flowDirection', (alpha: number) => {
+          // Apply forces based on the flow direction (source to target)
+          for (const link of links) {
+            const source = forceNodes.find(n => n.id === link.source);
+            const target = forceNodes.find(n => n.id === link.target);
+
+            if (!source || !target) continue;
+
+            // Determine the direction of the connection based on handles
+            let sourceIsTop = false;
+            let targetIsTop = false;
+
+            // Check source handle position (top or bottom)
+            if (link.sourceHandle) {
+              sourceIsTop = typeof link.sourceHandle === 'string' && link.sourceHandle.includes('top');
+            }
+
+            // Check target handle position (top or bottom)
+            if (link.targetHandle) {
+              targetIsTop = typeof link.targetHandle === 'string' && link.targetHandle.includes('top');
+            }
+
+            // Calculate vertical force strength based on handle positions
+            const verticalForceStrength = 5 * alpha;
+
+            // Apply vertical forces based on the connection direction
+            // If source connects from bottom, push it up in the layout
+            // If target connects at top, push it down in the layout
+            if (!sourceIsTop) { // Source connects from bottom
+              source.y = (source.y || 0) - verticalForceStrength;
+            }
+
+            if (!targetIsTop) { // Target connects at bottom
+              target.y = (target.y || 0) + verticalForceStrength;
+            }
+
+            // Apply horizontal separation force when nodes are at similar vertical positions
+            if (Math.abs((source.y || 0) - (target.y || 0)) < 80) {
+              const horizontalForceStrength = 3 * alpha;
+              source.x = (source.x || 0) - horizontalForceStrength;
+              target.x = (target.x || 0) + horizontalForceStrength;
+            }
+          }
+        });
+
+        // Add a force to spread nodes horizontally at the same depth level
+        simulation.force('spreadHorizontally', (alpha: number) => {
+          // Group nodes by depth
+          const nodesByDepth: Record<number, ForceNode[]> = {};
+
+          forceNodes.forEach(node => {
+            const depth = nodeDepths[node.id];
+            if (depth !== undefined) {
+              if (!nodesByDepth[depth]) {
+                nodesByDepth[depth] = [];
+              }
+              nodesByDepth[depth].push(node);
+            }
+          });
+
+          // For each depth level, spread nodes horizontally
+          Object.entries(nodesByDepth).forEach(([_, nodesAtDepth]) => {
+            if (nodesAtDepth.length <= 1) return;
+
+            // Calculate target positions to spread nodes evenly
+            const totalWidth = 800; // Available width
+            const nodeSpacing = totalWidth / (nodesAtDepth.length + 1);
+
+            // Sort nodes by their current x position to maintain relative ordering
+            const sortedNodes = [...nodesAtDepth].sort((a, b) => (a.x || 0) - (b.x || 0));
+
+            sortedNodes.forEach((node, index) => {
+              const targetX = (index + 1) * nodeSpacing;
+              // Apply a gentle force towards the target position
+              // Use a stronger force for horizontal positioning
+              node.x = (node.x || 0) + ((targetX - (node.x || 0)) * alpha * 0.2);
+            });
+          });
+        });
       }
 
-      // Run the simulation for a moderate number of ticks
+      // Run the simulation for enough ticks to allow untangling
       simulation.stop();
-      simulation.tick(100); // Fewer ticks for more stability
+      simulation.tick(500); // Run for more ticks to ensure stable layout
 
       // Update the node positions based on the simulation
       // Ensure positions are within reasonable bounds
-      const updatedNodes = nodes.map((node, i) => {
-        const simulatedNode = forceNodes[i];
+      const updatedNodes = nodes.map((node) => {
+        const simulatedNode = forceNodes.find(n => n.id === node.id);
         if (simulatedNode && simulatedNode.x !== undefined && simulatedNode.y !== undefined) {
-          // Ensure positions are within reasonable bounds (0-800 for x, 0-600 for y)
-          const x = Math.max(0, Math.min(800, simulatedNode.x));
-          const y = Math.max(0, Math.min(600, simulatedNode.y));
+          // Ensure positions are within reasonable bounds (0-1000 for x, 0-800 for y)
+          const x = Math.max(0, Math.min(1000, simulatedNode.x));
+          const y = Math.max(0, Math.min(800, simulatedNode.y));
 
           return {
             ...node,

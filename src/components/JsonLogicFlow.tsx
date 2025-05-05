@@ -70,7 +70,16 @@ const JsonLogicFlow: React.FC<JsonLogicFlowProps> = ({
     if (initialNodes !== initialNodesRef.current) {
       initialNodesRef.current = initialNodes;
       if (initialNodes && initialNodes.length > 0) {
-        setNodes(initialNodes);
+        console.log('JsonLogicFlow: Setting nodes from props', initialNodes);
+        // Ensure nodes have valid positions
+        const validNodes = initialNodes.map(node => ({
+          ...node,
+          position: {
+            x: typeof node.position.x === 'number' ? node.position.x : 100,
+            y: typeof node.position.y === 'number' ? node.position.y : 100
+          }
+        }));
+        setNodes(validNodes);
       }
     }
   }, [initialNodes]);
@@ -79,7 +88,12 @@ const JsonLogicFlow: React.FC<JsonLogicFlowProps> = ({
     if (initialEdges !== initialEdgesRef.current) {
       initialEdgesRef.current = initialEdges;
       if (initialEdges && initialEdges.length > 0) {
-        setEdges(initialEdges);
+        console.log('JsonLogicFlow: Setting edges from props', initialEdges);
+        // Ensure edges have valid source and target
+        const validEdges = initialEdges.filter(edge =>
+          edge.source && edge.target && edge.id
+        );
+        setEdges(validEdges);
       }
     }
   }, [initialEdges]);
@@ -95,10 +109,11 @@ const JsonLogicFlow: React.FC<JsonLogicFlowProps> = ({
     (changes: NodeChange[]) => {
       onNodesChangeInternal(changes);
       if (onNodesChange) {
-        onNodesChange(nodes);
+        // Pass the changes to the parent component
+        onNodesChange(changes);
       }
     },
-    [nodes, onNodesChange, onNodesChangeInternal]
+    [onNodesChange, onNodesChangeInternal]
   );
 
   // Handle edge changes
@@ -106,10 +121,11 @@ const JsonLogicFlow: React.FC<JsonLogicFlowProps> = ({
     (changes: EdgeChange[]) => {
       onEdgesChangeInternal(changes);
       if (onEdgesChange) {
-        onEdgesChange(edges);
+        // Pass the changes to the parent component
+        onEdgesChange(changes);
       }
     },
-    [edges, onEdgesChange, onEdgesChangeInternal]
+    [onEdgesChange, onEdgesChangeInternal]
   );
 
   // Handle connections between nodes

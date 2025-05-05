@@ -31,6 +31,8 @@
     "reactflow": "^11.11.4"
   },
   "dependencies": {
+    "@types/d3-force": "^3.0.10",
+    "d3-force": "^3.0.0",
     "json-logic-js": "^2.0.5"
   },
   "devDependencies": {
@@ -56,6 +58,7 @@
     "rollup-plugin-peer-deps-external": "^2.2.4",
     "ts-jest": "^29.3.2",
     "tslib": "^2.6.2",
-    "typescript": "^5.4.3"
+    "typescript": "^5.4.3",
+    "vite-plugin-cli-browser-bridge": "^0.2.0"
   }
 }

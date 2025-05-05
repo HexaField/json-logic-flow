@@ -52,12 +52,12 @@ export interface CustomNodeData extends BaseNodeData {
 }
 
 // Union type for all node data
-export type NodeData = 
-  | RootNodeData 
-  | ValueNodeData 
-  | VarNodeData 
-  | OpNodeData 
-  | IfNodeData 
+export type NodeData =
+  | RootNodeData
+  | ValueNodeData
+  | VarNodeData
+  | OpNodeData
+  | IfNodeData
   | CustomNodeData;
 
 // Typed Node
@@ -70,9 +70,9 @@ export type JsonLogicEdge = Edge;
 export interface JsonLogicFlowProps {
   nodes?: JsonLogicNode[];
   edges?: JsonLogicEdge[];
-  onNodesChange?: (nodes: JsonLogicNode[]) => void;
-  onEdgesChange?: (edges: JsonLogicEdge[]) => void;
-  onConnect?: (params: any) => void;
+  onNodesChange?: (changes: any) => void;
+  onEdgesChange?: (changes: any) => void;
+  onConnect?: (params?: any) => void;
   onNodeSelect?: (node: JsonLogicNode | null) => void;
   readOnly?: boolean;
   className?: string;

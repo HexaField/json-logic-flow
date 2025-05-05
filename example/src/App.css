@@ -33,6 +33,7 @@
   flex: 1;
   min-height: 400px;
   border: 1px solid #ddd;
+  position: relative;
 }
 
 .example-panel {
@@ -40,6 +41,29 @@
   border-top: 1px solid #ddd;
   padding: 1rem;
   overflow: auto;
+}
+
+.rearrange-button {
+  padding: 8px 12px;
+  background: #4a90e2;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 14px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: background-color 0.2s;
+}
+
+.rearrange-button:hover {
+  background: #3a80d2;
+}
+
+.button-container {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 10;
 }
 
 @media (min-width: 768px) {
@@ -56,6 +80,7 @@
 
   .flow-container {
     flex: 3;
+    position: relative;
   }
 
   .example-panel {

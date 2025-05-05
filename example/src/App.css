@@ -23,9 +23,15 @@
   overflow: hidden;
 }
 
+.sidebar {
+  height: 200px;
+  border-bottom: 1px solid #ddd;
+  overflow: auto;
+}
+
 .flow-container {
   flex: 1;
-  min-height: 500px;
+  min-height: 400px;
   border: 1px solid #ddd;
 }
 
@@ -40,11 +46,18 @@
   .app-content {
     flex-direction: row;
   }
-  
+
+  .sidebar {
+    width: 250px;
+    height: auto;
+    border-bottom: none;
+    border-right: 1px solid #ddd;
+  }
+
   .flow-container {
     flex: 3;
   }
-  
+
   .example-panel {
     flex: 1;
     height: auto;

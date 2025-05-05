@@ -61,6 +61,29 @@ const JsonLogicFlow: React.FC<JsonLogicFlowProps> = ({
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [reactFlowInstance, setReactFlowInstance] = useState<ReactFlowInstance | null>(null);
 
+  // Get references to the initial props
+  const initialNodesRef = useRef(initialNodes);
+  const initialEdgesRef = useRef(initialEdges);
+
+  // Update internal state when props change
+  useEffect(() => {
+    if (initialNodes !== initialNodesRef.current) {
+      initialNodesRef.current = initialNodes;
+      if (initialNodes && initialNodes.length > 0) {
+        setNodes(initialNodes);
+      }
+    }
+  }, [initialNodes]);
+
+  useEffect(() => {
+    if (initialEdges !== initialEdgesRef.current) {
+      initialEdgesRef.current = initialEdges;
+      if (initialEdges && initialEdges.length > 0) {
+        setEdges(initialEdges);
+      }
+    }
+  }, [initialEdges]);
+
   // Update JSON Logic when nodes or edges change
   useEffect(() => {
     const result = graphToJsonLogic(nodes, edges);

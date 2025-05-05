@@ -1,0 +1,39 @@
+.examples-panel {
+  padding: 1rem;
+  background-color: #f8f9fa;
+  border-radius: 4px;
+  margin-bottom: 1rem;
+}
+
+.examples-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  max-height: 300px;
+  overflow-y: auto;
+}
+
+.example-item {
+  padding: 0.75rem;
+  background-color: white;
+  border: 1px solid #dee2e6;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.example-item:hover {
+  background-color: #f1f3f5;
+  border-color: #adb5bd;
+}
+
+.example-item h4 {
+  margin: 0 0 0.5rem 0;
+  font-size: 1rem;
+}
+
+.example-item p {
+  margin: 0;
+  font-size: 0.875rem;
+  color: #6c757d;
+}

@@ -6,6 +6,7 @@ interface ExamplePanelProps {
   onTestDataChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onEvaluate: () => void;
   evaluationResult: any;
+  jsonLogic?: any;
 }
 
 const ExamplePanel: React.FC<ExamplePanelProps> = ({
@@ -13,9 +14,19 @@ const ExamplePanel: React.FC<ExamplePanelProps> = ({
   onTestDataChange,
   onEvaluate,
   evaluationResult,
+  jsonLogic,
 }) => {
   return (
     <div className="example-panel-container">
+      {jsonLogic && (
+        <>
+          <h3>JSON Logic Rule</h3>
+          <div className="json-logic-display">
+            <pre>{JSON.stringify(jsonLogic, null, 2)}</pre>
+          </div>
+        </>
+      )}
+
       <h3>Test Data</h3>
       <textarea
         className="test-data-input"
@@ -23,11 +34,11 @@ const ExamplePanel: React.FC<ExamplePanelProps> = ({
         onChange={onTestDataChange}
         placeholder="Enter JSON test data..."
       />
-      
+
       <button className="evaluate-button" onClick={onEvaluate}>
         Evaluate
       </button>
-      
+
       <h3>Result</h3>
       <div className="evaluation-result">
         <pre>{JSON.stringify(evaluationResult, null, 2)}</pre>

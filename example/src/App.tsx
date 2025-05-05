@@ -31,7 +31,6 @@ const App: React.FC = () => {
 
   const handleNodesChange = useCallback((changes: any) => {
     // ReactFlow's onNodesChange passes NodeChange[] not the updated nodes array
-    console.log('Node changes received:', changes);
     // Apply the changes to our nodes using applyNodeChanges from ReactFlow
     setNodes((nds) => {
       // For position changes, we need to update the node positions
@@ -55,9 +54,8 @@ const App: React.FC = () => {
     });
   }, []);
 
-  const handleEdgesChange = useCallback((changes: any) => {
+  const handleEdgesChange = useCallback((_changes: any) => {
     // Handle edge changes from ReactFlow
-    console.log('Edge changes received:', changes);
     // Apply changes to edges
     setEdges(prevEdges => {
       // For simplicity, we'll just let JsonLogicFlow handle this internally
@@ -67,7 +65,6 @@ const App: React.FC = () => {
 
   const handleConnect = useCallback(() => {
     // This is handled internally by JsonLogicFlow
-    console.log('Connection handled by JsonLogicFlow');
   }, []);
 
   // Load example flow when selected example changes
@@ -77,8 +74,7 @@ const App: React.FC = () => {
     console.log('Example flow found:', !!exampleFlow);
 
     if (exampleFlow && exampleFlow.flow) {
-      console.log('Original nodes:', exampleFlow.flow.nodes);
-      console.log('Original edges:', exampleFlow.flow.edges);
+      console.log('Loading example flow:', exampleFlow.id);
 
       // Make a deep copy of nodes and ensure they have valid positions
       const validatedNodes = exampleFlow.flow.nodes.map(node => ({
@@ -108,13 +104,15 @@ const App: React.FC = () => {
   }, [selectedExample]);
 
   // Function to run the force simulation
-  const runForceSimulation = useCallback(() => {
-    console.log('Running force simulation, nodes count:', nodes.length);
-    if (nodes.length === 0) return;
+  // Takes nodes and edges as parameters instead of using from state
+  // This prevents unnecessary recreation of the function when nodes/edges change
+  const runForceSimulation = useCallback((nodesToLayout: JsonLogicNode[], edgesToLayout: JsonLogicEdge[]) => {
+    console.log('Running force simulation, nodes count:', nodesToLayout.length);
+    if (nodesToLayout.length === 0) return nodesToLayout;
 
     try {
       // Create force nodes from ReactFlow nodes
-      const forceNodes: ForceNode[] = nodes.map((node, index) => ({
+      const forceNodes: ForceNode[] = nodesToLayout.map((node, index) => ({
         id: node.id,
         originalIndex: index,
         // Initialize with current positions if available
@@ -129,19 +127,12 @@ const App: React.FC = () => {
 
       // Create links from edges for the force simulation
       // Make sure we only include links where both source and target nodes exist
-      const links = edges
+      const links = edgesToLayout
         .filter(edge =>
           forceNodes.some(node => node.id === edge.source) &&
           forceNodes.some(node => node.id === edge.target)
         )
         .map(edge => {
-          console.log('Edge handles:', {
-            source: edge.source,
-            target: edge.target,
-            sourceHandle: edge.sourceHandle,
-            targetHandle: edge.targetHandle
-          });
-
           return {
             source: edge.source,
             target: edge.target,
@@ -243,7 +234,7 @@ const App: React.FC = () => {
         }
 
         // For any unvisited nodes, assign a middle depth
-        const maxDepth = Math.max(...Object.values(nodeDepths).filter(d => d >= 0));
+        const maxDepth = Math.max(...Object.values(nodeDepths).filter(d => d >= 0), 0);
         forceNodes.forEach(node => {
           if (nodeDepths[node.id] === -1) {
             nodeDepths[node.id] = Math.floor(maxDepth / 2);
@@ -367,44 +358,59 @@ const App: React.FC = () => {
 
       // Run the simulation for enough ticks to allow untangling
       simulation.stop();
-      simulation.tick(500); // Run for more ticks to ensure stable layout
+      simulation.tick(2000); // Run for more ticks to ensure stable layout
 
       // Update the node positions based on the simulation
-      // Ensure positions are within reasonable bounds
-      const updatedNodes = nodes.map((node) => {
+      // Apply the simulated positions directly
+      const updatedNodes = nodesToLayout.map((node) => {
         const simulatedNode = forceNodes.find(n => n.id === node.id);
         if (simulatedNode && simulatedNode.x !== undefined && simulatedNode.y !== undefined) {
-          // Ensure positions are within reasonable bounds (0-1000 for x, 0-800 for y)
-          const x = Math.max(0, Math.min(1000, simulatedNode.x));
-          const y = Math.max(0, Math.min(800, simulatedNode.y));
-
+          // Use the simulated positions directly without bounds restriction
           return {
             ...node,
-            position: { x, y }
+            position: {
+              x: simulatedNode.x,
+              y: simulatedNode.y
+            }
           };
         }
         return node;
       });
 
-      console.log('Updated nodes with new positions:', updatedNodes);
-      setNodes(updatedNodes);
-      console.log('Nodes state updated');
+      console.log('Simulation completed with updated node positions');
+      return updatedNodes;
     } catch (error) {
       console.error("Force simulation error:", error);
-      // Continue without applying force simulation
+      // Return original nodes if simulation fails
+      return nodesToLayout;
     }
-  }, [nodes, edges]);
+  }, []);
 
-  // Apply force simulation when nodes change or when manually triggered
+  // Apply force simulation only when explicitly triggered
+  // This prevents constant re-rendering
+  const applyForceSimulation = useCallback(() => {
+    if (nodes.length === 0) return;
+
+    console.log('Applying force simulation to current nodes');
+    const updatedNodes = runForceSimulation(nodes, edges);
+    setNodes(updatedNodes);
+  }, [nodes, edges, runForceSimulation]);
+
+  // Run simulation when example changes or when manually triggered
   useEffect(() => {
+    // Only run if we have nodes to layout
+    if (nodes.length === 0) return;
+
     // Delay the force simulation to ensure nodes are properly rendered first
     const timer = setTimeout(() => {
-      console.log('Running delayed force simulation');
-      runForceSimulation();
+      console.log('Running delayed force simulation after example change');
+      applyForceSimulation();
     }, 500);
 
     return () => clearTimeout(timer);
-  }, [runForceSimulation, selectedExample, forceSimulationKey]);
+    // Only depend on selectedExample and forceSimulationKey, not on nodes/edges
+    // This prevents infinite update loops
+  }, [selectedExample, forceSimulationKey, applyForceSimulation]);
 
   // Handler for the re-run simulation button
   const handleRerunSimulation = useCallback(() => {
@@ -413,13 +419,15 @@ const App: React.FC = () => {
     setForceSimulationKey(prev => prev + 1);
     // Also run the simulation directly for immediate feedback
     setTimeout(() => {
-      runForceSimulation();
+      applyForceSimulation();
     }, 10);
-  }, [runForceSimulation]);
+  }, [applyForceSimulation]);
 
   // Handle selecting an example
   const handleSelectExample = useCallback((example: typeof examples[0]) => {
     setSelectedExample(example);
+    // Trigger force simulation after example change
+    setForceSimulationKey(prev => prev + 1);
   }, []);
 
   const handleTestDataChange = useCallback((e: React.ChangeEvent<HTMLTextAreaElement>) => {
